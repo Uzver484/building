@@ -424,9 +424,9 @@
                 // Загружаем все текстуры
                 Promise.all([
                     // Трава
-                    loader.loadAsync('textures/grass/normal.jpg').then(tex => this.textures.grassDiffuse = tex),
-                    loader.loadAsync('https://threejs.org/examples/textures/terrain/grass_01_nor_1k.jpg').then(tex => this.textures.grassNormal = tex),
-                    loader.loadAsync('https://threejs.org/examples/textures/terrain/grass_01_rough_1k.jpg').then(tex => this.textures.grassRough = tex),
+                    loader.loadAsync('textures/grass/diffuse.jpg').then(tex => this.textures.grassDiffuse = tex),
+                    loader.loadAsync('textures/grass/normal.jpg').then(tex => this.textures.grassNormal = tex),
+                    loader.loadAsync('textures/grass/roughness.jpg').then(tex => this.textures.grassRough = tex),
                     
                     // Кирпич
                     loader.loadAsync('https://threejs.org/examples/textures/brick_diffuse.jpg').then(tex => this.textures.brickDiffuse = tex),
