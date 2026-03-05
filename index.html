@@ -36,23 +36,21 @@
             position: relative;
         }
 
-        /* === ОБЛАКА СВЕРХУ === */
+        /* === ОБЛАКА ТОЛЬКО НАД ИГРОВЫМ ПОЛЕМ === */
         #cloudLayer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 120px;
+            position: absolute;
+            top: -30px;
+            left: 10px;
+            width: 900px;
+            height: 80px;
             pointer-events: none;
             z-index: 50;
             overflow: hidden;
-            background: linear-gradient(to bottom, rgba(135, 206, 235, 0.35), transparent);
-            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 15px 15px 0 0;
         }
 
         .cloud {
             position: absolute;
-            top: 10px;
             background: rgba(255, 255, 255, 0.92);
             border-radius: 50%;
             box-shadow: 
@@ -87,7 +85,7 @@
 
         @keyframes floatCloud {
             0% { transform: translateX(-150px); }
-            100% { transform: translateX(calc(100vw + 150px)); }
+            100% { transform: translateX(1050px); }
         }
 
         #gameArea {
@@ -352,10 +350,10 @@
     </style>
 </head>
 <body>
-    <!-- Слой с облаками -->
-    <div id="cloudLayer" aria-hidden="true"></div>
-    
     <div id="gameContainer">
+        <!-- Облака внутри контейнера, только над полем -->
+        <div id="cloudLayer" aria-hidden="true"></div>
+        
         <div id="gameArea">
             <div id="controlsHint">◀ ▶ Поворот • Клик по полю или дому</div>
             <canvas id="gridCanvas"></canvas>
@@ -418,6 +416,7 @@
         class CityGame {
             constructor() {
                 this.gridSize = 14;
+                this.cellSize = 1; // Размер клетки в 3D-единицах
                 this.grid = [];
                 this.population = 0;
                 this.buildingsCount = 0;
@@ -429,22 +428,20 @@
                 // Параметры для поворота
                 this.sceneRotation = 0;
                 
-                // Центр поля
-                this.centerX = 6.5;
-                this.centerY = 2;
-                this.centerZ = 6.5;
+                // Центр поля (индексы 0-13, центр между 6 и 7)
+                this.fieldCenter = (this.gridSize - 1) / 2; // 6.5
                 
                 // Камера
                 this.cameraPosition = {
-                    x: 6.5,
+                    x: this.fieldCenter,
                     y: 18,
-                    z: 22
+                    z: this.fieldCenter + 15
                 };
                 
                 // Для рейкастинга
                 this.raycaster = new THREE.Raycaster();
                 this.mouse = new THREE.Vector2();
-                this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
                 
                 // 3D сцена
                 this.scene = null;
@@ -452,7 +449,7 @@
                 this.renderer = null;
                 this.buildings = [];
                 this.fieldGroup = null;
-                this.clouds = [];
+                this.clouds3D = [];
                 
                 // Текстуры
                 this.textures = {};
@@ -507,14 +504,14 @@
                     this.generateNextHouse();
                     this.updateInfo();
                     this.setupEventListeners();
-                    this.createClouds(); // Генерация облаков
+                    this.createClouds();
                 }).catch(error => {
                     console.warn('Ошибка загрузки текстур:', error);
                     this.initThree();
                     this.generateNextHouse();
                     this.updateInfo();
                     this.setupEventListeners();
-                    this.createClouds(); // Генерация облаков даже при ошибке
+                    this.createClouds();
                 });
             }
             
@@ -537,17 +534,6 @@
                     ctx.fill();
                 }
                 
-                ctx.fillStyle = 'rgba(220, 220, 220, 0.4)';
-                for (let i = 0; i < 15; i++) {
-                    const x = 200 + Math.random() * 600;
-                    const y = 200 + Math.random() * 120;
-                    const radius = 50 + Math.random() * 80;
-                    
-                    ctx.beginPath();
-                    ctx.arc(x, y, radius, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
                 const texture = new THREE.CanvasTexture(canvas);
                 return texture;
             }
@@ -557,19 +543,22 @@
                 const layer = document.getElementById('cloudLayer');
                 if (!layer) return;
                 
-                for (let i = 0; i < 5; i++) {
+                layer.innerHTML = '';
+                
+                for (let i = 0; i < 6; i++) {
                     const cloud = document.createElement('div');
                     cloud.className = 'cloud';
                     
-                    const size = 40 + Math.random() * 30;
-                    const top = 5 + Math.random() * 40;
-                    const delay = Math.random() * 30;
-                    const duration = 40 + Math.random() * 40;
+                    const size = 40 + Math.random() * 35;
+                    const top = 5 + Math.random() * 35;
+                    const delay = Math.random() * 25;
+                    const duration = 35 + Math.random() * 35;
+                    const left = -150 - Math.random() * 200;
                     
                     cloud.style.width = size + 'px';
                     cloud.style.height = size * 0.6 + 'px';
                     cloud.style.top = top + 'px';
-                    cloud.style.left = (-150 - Math.random() * 200) + 'px';
+                    cloud.style.left = left + 'px';
                     cloud.style.animationDelay = delay + 's';
                     cloud.style.animationDuration = duration + 's';
                     
@@ -582,7 +571,8 @@
                 this.scene.background = new THREE.Color(0x87CEEB);
                 
                 this.fieldGroup = new THREE.Group();
-                this.fieldGroup.position.set(this.centerX, 0, this.centerZ);
+                // Центр группы в центре поля
+                this.fieldGroup.position.set(this.fieldCenter, 0, this.fieldCenter);
                 
                 this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
                 
@@ -592,7 +582,7 @@
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 
-                // --- 3D ОБЛАКА (дополнительно к CSS) ---
+                // --- 3D ОБЛАКА (дополнительно) ---
                 const cloudTexture = this.createCloudTexture();
                 const cloudMat = new THREE.MeshStandardMaterial({
                     map: cloudTexture,
@@ -603,7 +593,7 @@
                     side: THREE.DoubleSide
                 });
                 
-                for (let i = 0; i < 12; i++) {
+                for (let i = 0; i < 10; i++) {
                     const cloudGroup = new THREE.Group();
                     const parts = 3 + Math.floor(Math.random() * 3);
                     
@@ -624,21 +614,18 @@
                     const scale = 2.5 + Math.random() * 2;
                     cloudGroup.scale.set(scale, scale * 0.35, scale * 0.5);
                     
-                    const y = 22 + Math.random() * 10;
-                    const z = -25 + Math.random() * 50;
-                    const startX = -45 + Math.random() * 20;
+                    const y = 20 + Math.random() * 8;
+                    const z = -20 + Math.random() * 40;
+                    const startX = -40 + Math.random() * 20;
                     
                     cloudGroup.position.set(startX, y, z);
                     
                     cloudGroup.userData = {
-                        speed: 0.015 + Math.random() * 0.025,
-                        startX: startX,
-                        y: y,
-                        z: z
+                        speed: 0.02 + Math.random() * 0.03
                     };
                     
                     this.scene.add(cloudGroup);
-                    this.clouds.push(cloudGroup);
+                    this.clouds3D.push(cloudGroup);
                 }
                 
                 // --- ОСВЕЩЕНИЕ ---
@@ -668,7 +655,7 @@
                     const mainGrassGeo = new THREE.PlaneGeometry(40, 40, 50, 50);
                     const mainGrass = new THREE.Mesh(mainGrassGeo, grassMat);
                     mainGrass.rotation.x = -Math.PI / 2;
-                    mainGrass.position.set(this.centerX, -0.02, this.centerZ);
+                    mainGrass.position.set(this.fieldCenter, -0.02, this.fieldCenter);
                     mainGrass.receiveShadow = true;
                     this.scene.add(mainGrass);
                     
@@ -682,7 +669,7 @@
                     const baseGeo = new THREE.PlaneGeometry(this.gridSize, this.gridSize, 20, 20);
                     const baseField = new THREE.Mesh(baseGeo, baseMat);
                     baseField.rotation.x = -Math.PI / 2;
-                    baseField.position.set(this.centerX, 0, this.centerZ);
+                    baseField.position.set(this.fieldCenter, 0, this.fieldCenter);
                     baseField.receiveShadow = true;
                     this.scene.add(baseField);
                 }
@@ -698,13 +685,13 @@
                 
                 // Камера
                 this.camera.position.set(this.cameraPosition.x, this.cameraPosition.y, this.cameraPosition.z);
-                this.camera.lookAt(this.centerX, this.centerY, this.centerZ);
+                this.camera.lookAt(this.fieldCenter, 2, this.fieldCenter);
                 this.camera.up.set(0, 0, 1);
                 
                 this.animate();
             }
             
-            createHouse(floors, x, z) {
+            createHouse(floors, gridX, gridZ) {
                 const group = new THREE.Group();
                 
                 const brickMat = new THREE.MeshStandardMaterial({
@@ -728,7 +715,7 @@
                 const height = floors * 0.6;
                 
                 // Основное здание
-                const buildingGeo = new THREE.BoxGeometry(0.95, height, 0.95);
+                const buildingGeo = new THREE.BoxGeometry(0.9, height, 0.9);
                 const building = new THREE.Mesh(buildingGeo, brickMat);
                 building.position.y = height / 2;
                 building.castShadow = true;
@@ -737,7 +724,7 @@
                 
                 // Крыша
                 if (floors >= 3) {
-                    const roofGeo = new THREE.ConeGeometry(0.6, 0.4, 8);
+                    const roofGeo = new THREE.ConeGeometry(0.55, 0.4, 8);
                     const roof = new THREE.Mesh(roofGeo, roofMat);
                     roof.position.y = height + 0.2;
                     roof.castShadow = true;
@@ -756,13 +743,13 @@
                 for (let f = 0; f < floors; f++) {
                     const yPos = f * 0.6 + 0.3;
                     
-                    const frameGeo = new THREE.BoxGeometry(0.25, 0.25, 0.05);
+                    const frameGeo = new THREE.BoxGeometry(0.22, 0.22, 0.05);
                     const frame = new THREE.Mesh(frameGeo, woodMat);
-                    frame.position.set(0, yPos, 0.48);
+                    frame.position.set(0, yPos, 0.46);
                     frame.castShadow = true;
                     group.add(frame);
                     
-                    const glassGeo = new THREE.BoxGeometry(0.2, 0.2, 0.02);
+                    const glassGeo = new THREE.BoxGeometry(0.18, 0.18, 0.02);
                     const glassMat = new THREE.MeshStandardMaterial({
                         color: 0x88aaff,
                         emissive: 0x112233,
@@ -770,14 +757,17 @@
                         opacity: 0.7
                     });
                     const glass = new THREE.Mesh(glassGeo, glassMat);
-                    glass.position.set(0, yPos, 0.5);
+                    glass.position.set(0, yPos, 0.48);
                     glass.castShadow = true;
                     group.add(glass);
                 }
                 
-                // === ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ ===
-                const localX = (x + 0.5) - this.centerX;
-                const localZ = (z + 0.5) - this.centerZ;
+                // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Позиционирование дома ===
+                // Клетка (gridX, gridZ) имеет центр в (gridX + 0.5, gridZ + 0.5)
+                // fieldGroup центрирован в (fieldCenter, 0, fieldCenter)
+                // Поэтому локальная позиция = (gridX + 0.5 - fieldCenter, 0, gridZ + 0.5 - fieldCenter)
+                const localX = gridX + 0.5 - this.fieldCenter;
+                const localZ = gridZ + 0.5 - this.fieldCenter;
                 group.position.set(localX, 0, localZ);
                 
                 return group;
@@ -818,31 +808,37 @@
                 this.fieldGroup.rotation.y = this.sceneRotation;
             }
             
-            // === ИСПРАВЛЕННАЯ ФУНКЦИЯ ОПРЕДЕЛЕНИЯ КЛЕТКИ ===
+            // === КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Определение клетки ===
             getGridCellFromRay(ray) {
                 const intersection = new THREE.Vector3();
                 
-                if (ray.intersectPlane(this.plane, intersection)) {
+                if (ray.intersectPlane(this.groundPlane, intersection)) {
+                    // Мировые координаты клика
                     const worldX = intersection.x;
                     const worldZ = intersection.z;
                     
-                    // Обратное вращение для учёта поворота поля
+                    // Преобразуем в локальные координаты fieldGroup (с учётом поворота)
                     const cos = Math.cos(-this.sceneRotation);
                     const sin = Math.sin(-this.sceneRotation);
                     
-                    const dx = worldX - this.centerX;
-                    const dz = worldZ - this.centerZ;
+                    // Смещение относительно центра поля
+                    const dx = worldX - this.fieldCenter;
+                    const dz = worldZ - this.fieldCenter;
                     
-                    const localX = dx * cos - dz * sin + this.centerX;
-                    const localZ = dx * sin + dz * cos + this.centerZ;
+                    // Обратный поворот
+                    const localX = dx * cos - dz * sin;
+                    const localZ = dx * sin + dz * cos;
                     
-                    // +0.001 для защиты от float-погрешностей
-                    const gridX = Math.floor(localX + 0.001);
-                    const gridY = Math.floor(localZ + 0.001);
+                    // Преобразуем в индексы сетки
+                    // localX = gridX + 0.5 - fieldCenter
+                    // gridX = localX + fieldCenter - 0.5
+                    const gridX = Math.floor(localX + this.fieldCenter + 0.001);
+                    const gridZ = Math.floor(localZ + this.fieldCenter + 0.001);
                     
+                    // Проверка границ
                     if (gridX >= 0 && gridX < this.gridSize && 
-                        gridY >= 0 && gridY < this.gridSize) {
-                        return { x: gridX, y: gridY };
+                        gridZ >= 0 && gridZ < this.gridSize) {
+                        return { x: gridX, y: gridZ };
                     }
                 }
                 return null;
@@ -874,11 +870,11 @@
                 requestAnimationFrame(() => this.animate());
                 
                 // Анимация 3D-облаков
-                this.clouds.forEach(cloud => {
+                this.clouds3D.forEach(cloud => {
                     if (cloud.userData) {
                         cloud.position.x += cloud.userData.speed;
-                        if (cloud.position.x > 50) {
-                            cloud.position.x = -50;
+                        if (cloud.position.x > 45) {
+                            cloud.position.x = -45;
                         }
                     }
                 });
