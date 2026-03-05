@@ -33,6 +33,61 @@
             gap: 10px;
             max-width: 98vw;
             max-height: 98vh;
+            position: relative;
+        }
+
+        /* === ОБЛАКА СВЕРХУ === */
+        #cloudLayer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 120px;
+            pointer-events: none;
+            z-index: 50;
+            overflow: hidden;
+            background: linear-gradient(to bottom, rgba(135, 206, 235, 0.35), transparent);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .cloud {
+            position: absolute;
+            top: 10px;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 50%;
+            box-shadow: 
+                25px 8px 0 rgba(255,255,255,0.85),
+                -20px 5px 0 rgba(255,255,255,0.8),
+                10px -5px 0 rgba(255,255,255,0.9);
+            animation: floatCloud linear infinite;
+            opacity: 0.95;
+        }
+
+        .cloud::before,
+        .cloud::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+        }
+
+        .cloud::before {
+            width: 50px;
+            height: 50px;
+            top: -20px;
+            left: 15px;
+        }
+
+        .cloud::after {
+            width: 40px;
+            height: 40px;
+            top: -15px;
+            left: 45px;
+        }
+
+        @keyframes floatCloud {
+            0% { transform: translateX(-150px); }
+            100% { transform: translateX(calc(100vw + 150px)); }
         }
 
         #gameArea {
@@ -297,6 +352,9 @@
     </style>
 </head>
 <body>
+    <!-- Слой с облаками -->
+    <div id="cloudLayer" aria-hidden="true"></div>
+    
     <div id="gameContainer">
         <div id="gameArea">
             <div id="controlsHint">◀ ▶ Поворот • Клик по полю или дому</div>
@@ -371,7 +429,7 @@
                 // Параметры для поворота
                 this.sceneRotation = 0;
                 
-                // Центр поля - ВАЖНО: координаты от 0 до 13, центр 6.5
+                // Центр поля
                 this.centerX = 6.5;
                 this.centerY = 2;
                 this.centerZ = 6.5;
@@ -449,12 +507,14 @@
                     this.generateNextHouse();
                     this.updateInfo();
                     this.setupEventListeners();
+                    this.createClouds(); // Генерация облаков
                 }).catch(error => {
                     console.warn('Ошибка загрузки текстур:', error);
                     this.initThree();
                     this.generateNextHouse();
                     this.updateInfo();
                     this.setupEventListeners();
+                    this.createClouds(); // Генерация облаков даже при ошибке
                 });
             }
             
@@ -492,6 +552,31 @@
                 return texture;
             }
             
+            // === ГЕНЕРАЦИЯ CSS-ОБЛАКОВ ===
+            createClouds() {
+                const layer = document.getElementById('cloudLayer');
+                if (!layer) return;
+                
+                for (let i = 0; i < 5; i++) {
+                    const cloud = document.createElement('div');
+                    cloud.className = 'cloud';
+                    
+                    const size = 40 + Math.random() * 30;
+                    const top = 5 + Math.random() * 40;
+                    const delay = Math.random() * 30;
+                    const duration = 40 + Math.random() * 40;
+                    
+                    cloud.style.width = size + 'px';
+                    cloud.style.height = size * 0.6 + 'px';
+                    cloud.style.top = top + 'px';
+                    cloud.style.left = (-150 - Math.random() * 200) + 'px';
+                    cloud.style.animationDelay = delay + 's';
+                    cloud.style.animationDuration = duration + 's';
+                    
+                    layer.appendChild(cloud);
+                }
+            }
+            
             initThree() {
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x87CEEB);
@@ -507,7 +592,7 @@
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 
-                // --- ОБЛАКА ---
+                // --- 3D ОБЛАКА (дополнительно к CSS) ---
                 const cloudTexture = this.createCloudTexture();
                 const cloudMat = new THREE.MeshStandardMaterial({
                     map: cloudTexture,
@@ -587,7 +672,6 @@
                     mainGrass.receiveShadow = true;
                     this.scene.add(mainGrass);
                     
-                    // Основание под домами
                     const baseMat = new THREE.MeshStandardMaterial({
                         map: this.textures.grassDiffuse,
                         normalMap: this.textures.grassNormal,
@@ -691,12 +775,9 @@
                     group.add(glass);
                 }
                 
-                // ВАЖНО: правильное позиционирование дома
-                // Поле от 0 до 13, центр группы в (6.5, 0, 6.5)
-                // Дом должен быть в центре клетки: (x + 0.5) в мировых координатах
-                // В локальных координатах группы: (x + 0.5 - centerX)
-                const localX = x + 0.5 - this.centerX;
-                const localZ = z + 0.5 - this.centerZ;
+                // === ИСПРАВЛЕННОЕ ПОЗИЦИОНИРОВАНИЕ ===
+                const localX = (x + 0.5) - this.centerX;
+                const localZ = (z + 0.5) - this.centerZ;
                 group.position.set(localX, 0, localZ);
                 
                 return group;
@@ -737,40 +818,31 @@
                 this.fieldGroup.rotation.y = this.sceneRotation;
             }
             
+            // === ИСПРАВЛЕННАЯ ФУНКЦИЯ ОПРЕДЕЛЕНИЯ КЛЕТКИ ===
             getGridCellFromRay(ray) {
                 const intersection = new THREE.Vector3();
                 
                 if (ray.intersectPlane(this.plane, intersection)) {
-                    // Получаем мировые координаты точки клика
-                    const worldPoint = intersection.clone();
+                    const worldX = intersection.x;
+                    const worldZ = intersection.z;
                     
-                    // Преобразуем в локальные координаты группы с учетом поворота
-                    const localPoint = worldPoint.clone();
-                    localPoint.sub(new THREE.Vector3(this.centerX, 0, this.centerZ));
+                    // Обратное вращение для учёта поворота поля
+                    const cos = Math.cos(-this.sceneRotation);
+                    const sin = Math.sin(-this.sceneRotation);
                     
-                    // Применяем обратный поворот группы
-                    const quaternion = new THREE.Quaternion().setFromEuler(
-                        new THREE.Euler(0, -this.sceneRotation, 0)
-                    );
-                    localPoint.applyQuaternion(quaternion);
+                    const dx = worldX - this.centerX;
+                    const dz = worldZ - this.centerZ;
                     
-                    // Добавляем обратно центр для получения координат в мировом пространстве
-                    const gridPoint = localPoint.clone();
-                    gridPoint.add(new THREE.Vector3(this.centerX, 0, this.centerZ));
+                    const localX = dx * cos - dz * sin + this.centerX;
+                    const localZ = dx * sin + dz * cos + this.centerZ;
                     
-                    // Получаем координаты клетки
-                    const gridX = Math.floor(gridPoint.x);
-                    const gridY = Math.floor(gridPoint.z);
+                    // +0.001 для защиты от float-погрешностей
+                    const gridX = Math.floor(localX + 0.001);
+                    const gridY = Math.floor(localZ + 0.001);
                     
-                    // Проверяем, что точка внутри поля
                     if (gridX >= 0 && gridX < this.gridSize && 
                         gridY >= 0 && gridY < this.gridSize) {
-                        
-                        // Проверяем, что точка находится внутри клетки (строго по границам)
-                        if (gridPoint.x >= gridX && gridPoint.x < gridX + 1 && 
-                            gridPoint.z >= gridY && gridPoint.z < gridY + 1) {
-                            return { x: gridX, y: gridY };
-                        }
+                        return { x: gridX, y: gridY };
                     }
                 }
                 return null;
@@ -801,7 +873,7 @@
             animate() {
                 requestAnimationFrame(() => this.animate());
                 
-                // Анимация облаков
+                // Анимация 3D-облаков
                 this.clouds.forEach(cloud => {
                     if (cloud.userData) {
                         cloud.position.x += cloud.userData.speed;
