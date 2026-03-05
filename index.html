@@ -371,16 +371,16 @@
                 // Параметры для поворота
                 this.sceneRotation = 0;
                 
-                // Центр поля - ИСПРАВЛЕНО!
-                this.centerX = 6.5;  // Центр поля 14x14 (от 0 до 13, центр 6.5)
-                this.centerY = 2;     // Высота обзора
-                this.centerZ = 6.5;   // Центр поля по Z
+                // Центр поля
+                this.centerX = 6.5;
+                this.centerY = 2;
+                this.centerZ = 6.5;
                 
-                // Камера - ИСПРАВЛЕНО!
+                // Камера
                 this.cameraPosition = {
-                    x: 6.5,    // Точно по центру X
-                    y: 18,      // Высота камеры
-                    z: 22       // Отдаление
+                    x: 6.5,
+                    y: 18,
+                    z: 22
                 };
                 
                 // Для рейкастинга
@@ -394,6 +394,7 @@
                 this.renderer = null;
                 this.buildings = [];
                 this.fieldGroup = null;
+                this.staticGrass = null; // Статичная трава
                 
                 // Текстуры
                 this.textures = {};
@@ -421,7 +422,7 @@
             loadTextures() {
                 const loader = new THREE.TextureLoader();
                 
-                // Загружаем все текстуры - ИСПРАВЛЕНО!
+                // Загружаем все текстуры
                 Promise.all([
                     // Трава
                     loader.loadAsync('textures/grass/diffuse.jpg').then(tex => this.textures.grassDiffuse = tex),
@@ -468,7 +469,7 @@
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x87CEEB);
                 
-                // Создаем группу для вращения поля
+                // Создаем группу для вращения поля (только дома и сетка)
                 this.fieldGroup = new THREE.Group();
                 this.fieldGroup.position.set(this.centerX, 0, this.centerZ);
                 
@@ -545,7 +546,7 @@
                 fillLight.position.set(-10, 15, 20);
                 this.scene.add(fillLight);
                 
-                // --- ТРАВА ВОКРУГ ПОЛЯ (не вращается) ---
+                // --- СТАТИЧНАЯ ТРАВА (НЕ ВРАЩАЕТСЯ) ---
                 if (this.textures.grassDiffuse) {
                     const grassMat = new THREE.MeshStandardMaterial({
                         map: this.textures.grassDiffuse,
@@ -554,41 +555,69 @@
                         roughness: 0.8
                     });
                     
+                    // Большая плоскость травы вокруг поля (статичная)
                     const mainGrassGeo = new THREE.PlaneGeometry(40, 40, 50, 50);
                     const mainGrass = new THREE.Mesh(mainGrassGeo, grassMat);
                     mainGrass.rotation.x = -Math.PI / 2;
                     mainGrass.position.set(this.centerX, -0.02, this.centerZ);
                     mainGrass.receiveShadow = true;
                     this.scene.add(mainGrass);
+                    
+                    // Добавляем декоративные травинки
+                    for (let i = 0; i < 200; i++) {
+                        const bladeGeo = new THREE.ConeGeometry(0.03, 0.2 + Math.random() * 0.3, 4);
+                        const bladeMat = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color(
+                                0.2 + Math.random() * 0.3,
+                                0.5 + Math.random() * 0.3,
+                                0.1 + Math.random() * 0.2
+                            )
+                        });
+                        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+                        
+                        const angle = Math.random() * Math.PI * 2;
+                        const radius = 5 + Math.random() * 15;
+                        
+                        blade.position.set(
+                            this.centerX + Math.cos(angle) * radius,
+                            0.1,
+                            this.centerZ + Math.sin(angle) * radius
+                        );
+                        blade.castShadow = true;
+                        blade.receiveShadow = true;
+                        this.scene.add(blade);
+                    }
                 }
                 
-                // --- ИГРОВОЕ ПОЛЕ (вращается) ---
+                // --- ИГРОВОЕ ПОЛЕ (НЕ ВРАЩАЕТСЯ - ПРОСТО ТЕКСТУРА) ---
+                // Это основание под домами, которое не должно вращаться
                 if (this.textures.grassDiffuse) {
-                    const fieldMat = new THREE.MeshStandardMaterial({
+                    const baseMat = new THREE.MeshStandardMaterial({
                         map: this.textures.grassDiffuse,
                         normalMap: this.textures.grassNormal,
                         roughnessMap: this.textures.grassRough,
-                        roughness: 0.7
+                        roughness: 0.7,
+                        emissive: new THREE.Color(0x111111)
                     });
                     
-                    const fieldGeo = new THREE.PlaneGeometry(this.gridSize, this.gridSize, 20, 20);
-                    const field = new THREE.Mesh(fieldGeo, fieldMat);
-                    field.rotation.x = -Math.PI / 2;
-                    field.position.set(0, 0, 0);
-                    field.receiveShadow = true;
-                    this.fieldGroup.add(field);
+                    const baseGeo = new THREE.PlaneGeometry(this.gridSize, this.gridSize, 20, 20);
+                    const baseField = new THREE.Mesh(baseGeo, baseMat);
+                    baseField.rotation.x = -Math.PI / 2;
+                    baseField.position.set(this.centerX, 0, this.centerZ);
+                    baseField.receiveShadow = true;
+                    this.scene.add(baseField);
                 }
                 
-                // --- СЕТКА ПОД ТРАВОЙ (вращается) ---
+                // --- СЕТКА (ВРАЩАЕТСЯ В ГРУППЕ) ---
                 const gridHelper = new THREE.GridHelper(this.gridSize, this.gridSize, 0x8b6e4b, 0x5a3e2b);
-                gridHelper.position.set(0, 0.005, 0);
-                gridHelper.material.opacity = 0.3;
+                gridHelper.position.set(0, 0.01, 0);
+                gridHelper.material.opacity = 0.4;
                 gridHelper.material.transparent = true;
                 this.fieldGroup.add(gridHelper);
                 
-                // --- УГЛОВЫЕ МАРКЕРЫ (вращаются) ---
+                // Добавляем небольшие точки по углам для ориентации (вращаются)
                 const dotMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0x332200 });
-                const offset = this.gridSize / 2 - 0.5; // 6.5
+                const offset = this.gridSize / 2 - 0.5;
                 
                 const corners = [
                     [-offset, -offset], [-offset, offset],
@@ -596,9 +625,9 @@
                 ];
                 
                 corners.forEach(([x, z]) => {
-                    const dotGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                    const dotGeo = new THREE.SphereGeometry(0.12, 8, 8);
                     const dot = new THREE.Mesh(dotGeo, dotMat);
-                    dot.position.set(x, 0.01, z);
+                    dot.position.set(x, 0.02, z);
                     this.fieldGroup.add(dot);
                 });
                 
@@ -691,7 +720,7 @@
                     group.add(glass);
                 }
                 
-                // ВАЖНО: правильное позиционирование дома внутри группы
+                // Позиция дома относительно центра группы
                 const localX = x - this.centerX + 0.5;
                 const localZ = z - this.centerZ + 0.5;
                 group.position.set(localX, 0, localZ);
@@ -731,6 +760,7 @@
                     this.sceneRotation -= rotationSpeed;
                 }
                 
+                // Поворачиваем только группу с домами и сеткой
                 this.fieldGroup.rotation.y = this.sceneRotation;
             }
             
