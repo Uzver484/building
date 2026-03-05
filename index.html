@@ -371,7 +371,7 @@
                 // Параметры для поворота
                 this.sceneRotation = 0;
                 
-                // Центр поля
+                // Центр поля - ВАЖНО: координаты от 0 до 13, центр 6.5
                 this.centerX = 6.5;
                 this.centerY = 2;
                 this.centerZ = 6.5;
@@ -464,10 +464,7 @@
                 canvas.height = 512;
                 const ctx = canvas.getContext('2d');
                 
-                // Прозрачный фон
                 ctx.clearRect(0, 0, 1024, 512);
-                
-                // Рисуем пушистое облако
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
                 
                 for (let i = 0; i < 30; i++) {
@@ -480,7 +477,6 @@
                     ctx.fill();
                 }
                 
-                // Добавляем тени
                 ctx.fillStyle = 'rgba(220, 220, 220, 0.4)';
                 for (let i = 0; i < 15; i++) {
                     const x = 200 + Math.random() * 600;
@@ -511,7 +507,7 @@
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 
-                // --- ОБЛАКА ТОЛЬКО ВВЕРХУ ---
+                // --- ОБЛАКА ---
                 const cloudTexture = this.createCloudTexture();
                 const cloudMat = new THREE.MeshStandardMaterial({
                     map: cloudTexture,
@@ -522,12 +518,8 @@
                     side: THREE.DoubleSide
                 });
                 
-                // Создаем облака на разной высоте, но все в верхней части
                 for (let i = 0; i < 12; i++) {
-                    // Разные формы облаков
                     const cloudGroup = new THREE.Group();
-                    
-                    // Каждое облако состоит из 3-5 частей
                     const parts = 3 + Math.floor(Math.random() * 3);
                     
                     for (let j = 0; j < parts; j++) {
@@ -544,11 +536,9 @@
                         cloudGroup.add(cloudPart);
                     }
                     
-                    // Масштабируем облако
                     const scale = 2.5 + Math.random() * 2;
                     cloudGroup.scale.set(scale, scale * 0.35, scale * 0.5);
                     
-                    // Позиция - только в верхней части (Y высоко)
                     const y = 22 + Math.random() * 10;
                     const z = -25 + Math.random() * 50;
                     const startX = -45 + Math.random() * 20;
@@ -557,46 +547,6 @@
                     
                     cloudGroup.userData = {
                         speed: 0.015 + Math.random() * 0.025,
-                        startX: startX,
-                        y: y,
-                        z: z,
-                        baseY: y
-                    };
-                    
-                    this.scene.add(cloudGroup);
-                    this.clouds.push(cloudGroup);
-                }
-                
-                // Добавляем несколько плоских облаков для разнообразия
-                for (let i = 0; i < 6; i++) {
-                    const flatCloudMat = new THREE.MeshStandardMaterial({
-                        color: 0xffffff,
-                        emissive: 0x333333,
-                        transparent: true,
-                        opacity: 0.7
-                    });
-                    
-                    const cloudGroup = new THREE.Group();
-                    
-                    for (let j = 0; j < 4; j++) {
-                        const part = new THREE.Mesh(
-                            new THREE.SphereGeometry(1.2 + Math.random() * 0.8, 5, 4),
-                            flatCloudMat
-                        );
-                        part.position.set(j * 2.0 - 3.5, Math.sin(j) * 0.3, 0);
-                        cloudGroup.add(part);
-                    }
-                    
-                    cloudGroup.scale.set(2.0, 0.3, 0.6);
-                    
-                    const y = 20 + Math.random() * 8;
-                    const z = -15 + Math.random() * 30;
-                    const startX = -40 + Math.random() * 15;
-                    
-                    cloudGroup.position.set(startX, y, z);
-                    
-                    cloudGroup.userData = {
-                        speed: 0.02 + Math.random() * 0.03,
                         startX: startX,
                         y: y,
                         z: z
@@ -653,7 +603,7 @@
                     this.scene.add(baseField);
                 }
                 
-                // --- СЕТКА (БЕЗ ЖЕЛТЫХ ТОЧЕК) ---
+                // --- СЕТКА ---
                 const gridHelper = new THREE.GridHelper(this.gridSize, this.gridSize, 0x8b6e4b, 0x5a3e2b);
                 gridHelper.position.set(0, 0.01, 0);
                 gridHelper.material.opacity = 0.3;
@@ -741,9 +691,12 @@
                     group.add(glass);
                 }
                 
-                // ТОЧНОЕ ПОЗИЦИОНИРОВАНИЕ В ЦЕНТРЕ КЛЕТКИ
-                const localX = x - this.centerX + 0.5;
-                const localZ = z - this.centerZ + 0.5;
+                // ВАЖНО: правильное позиционирование дома
+                // Поле от 0 до 13, центр группы в (6.5, 0, 6.5)
+                // Дом должен быть в центре клетки: (x + 0.5) в мировых координатах
+                // В локальных координатах группы: (x + 0.5 - centerX)
+                const localX = x + 0.5 - this.centerX;
+                const localZ = z + 0.5 - this.centerZ;
                 group.position.set(localX, 0, localZ);
                 
                 return group;
@@ -801,7 +754,7 @@
                     );
                     localPoint.applyQuaternion(quaternion);
                     
-                    // Переводим обратно в мировые для определения клетки
+                    // Добавляем обратно центр для получения координат в мировом пространстве
                     const gridPoint = localPoint.clone();
                     gridPoint.add(new THREE.Vector3(this.centerX, 0, this.centerZ));
                     
@@ -814,20 +767,8 @@
                         gridY >= 0 && gridY < this.gridSize) {
                         
                         // Проверяем, что точка находится внутри клетки (строго по границам)
-                        const inCellX = gridPoint.x >= gridX && gridPoint.x < gridX + 1;
-                        const inCellY = gridPoint.z >= gridY && gridPoint.z < gridY + 1;
-                        
-                        // Дополнительно проверяем, что точка не слишком близко к границе
-                        const margin = 0.15; // Отступ от границы
-                        const nearLeftBorder = gridPoint.x - gridX < margin;
-                        const nearRightBorder = gridX + 1 - gridPoint.x < margin;
-                        const nearTopBorder = gridPoint.z - gridY < margin;
-                        const nearBottomBorder = gridY + 1 - gridPoint.z < margin;
-                        
-                        // Разрешаем клик только если точка внутри клетки и не у самого края
-                        if (inCellX && inCellY && 
-                            !nearLeftBorder && !nearRightBorder && 
-                            !nearTopBorder && !nearBottomBorder) {
+                        if (gridPoint.x >= gridX && gridPoint.x < gridX + 1 && 
+                            gridPoint.z >= gridY && gridPoint.z < gridY + 1) {
                             return { x: gridX, y: gridY };
                         }
                     }
@@ -860,11 +801,10 @@
             animate() {
                 requestAnimationFrame(() => this.animate());
                 
-                // Анимация облаков - движение СЛЕВА НАПРАВО
+                // Анимация облаков
                 this.clouds.forEach(cloud => {
                     if (cloud.userData) {
                         cloud.position.x += cloud.userData.speed;
-                        
                         if (cloud.position.x > 50) {
                             cloud.position.x = -50;
                         }
