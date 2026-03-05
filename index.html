@@ -460,28 +460,32 @@
             
             createCloudTexture() {
                 const canvas = document.createElement('canvas');
-                canvas.width = 512;
+                canvas.width = 1024;
                 canvas.height = 512;
                 const ctx = canvas.getContext('2d');
                 
-                ctx.clearRect(0, 0, 512, 512);
+                // Прозрачный фон
+                ctx.clearRect(0, 0, 1024, 512);
+                
+                // Рисуем длинное пушистое облако
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
                 
-                for (let i = 0; i < 20; i++) {
-                    const x = 256 + (Math.random() - 0.5) * 300;
-                    const y = 256 + (Math.random() - 0.5) * 200;
-                    const radius = 80 + Math.random() * 100;
+                for (let i = 0; i < 30; i++) {
+                    const x = 200 + Math.random() * 600;
+                    const y = 200 + Math.random() * 100;
+                    const radius = 60 + Math.random() * 80;
                     
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 
-                ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
-                for (let i = 0; i < 10; i++) {
-                    const x = 256 + (Math.random() - 0.5) * 280;
-                    const y = 256 + (Math.random() - 0.5) * 180;
-                    const radius = 70 + Math.random() * 90;
+                // Добавляем тени
+                ctx.fillStyle = 'rgba(220, 220, 220, 0.4)';
+                for (let i = 0; i < 15; i++) {
+                    const x = 200 + Math.random() * 600;
+                    const y = 200 + Math.random() * 80;
+                    const radius = 50 + Math.random() * 70;
                     
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -507,64 +511,80 @@
                 this.renderer.shadowMap.enabled = true;
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 
-                // --- ОБЛАКА СЛЕВА НАПРАВО ---
+                // --- ОБЛАКА ТОЛЬКО ВВЕРХУ ---
                 const cloudTexture = this.createCloudTexture();
-                const cloudMat = new THREE.MeshStandardMaterial({
-                    map: cloudTexture,
-                    color: 0xffffff,
-                    emissive: 0x333333,
-                    transparent: true,
-                    opacity: 0.85,
-                    side: THREE.DoubleSide
-                });
                 
-                // Создаем 30 облаков на разной высоте
-                for (let i = 0; i < 30; i++) {
+                // Создаем облака только в верхней части экрана
+                for (let i = 0; i < 8; i++) {
+                    const cloudMat = new THREE.MeshStandardMaterial({
+                        map: cloudTexture,
+                        color: 0xffffff,
+                        emissive: 0x333333,
+                        transparent: true,
+                        opacity: 0.8,
+                        side: THREE.DoubleSide
+                    });
+                    
+                    // Каждое облако - одна большая плоскость с текстурой
+                    const cloudGeo = new THREE.PlaneGeometry(25, 8);
+                    const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+                    
+                    // Позиция в верхней части (Y высоко)
+                    const y = 25 + Math.random() * 8;
+                    const z = -30 + Math.random() * 60;
+                    const startX = -40 + Math.random() * 20;
+                    
+                    cloud.position.set(startX, y, z);
+                    cloud.rotation.y = 0.1;
+                    
+                    // Немного наклоняем к камере
+                    cloud.rotation.x = -0.2;
+                    cloud.rotation.z = 0.05;
+                    
+                    cloud.userData = {
+                        speed: 0.02 + Math.random() * 0.03,
+                        startX: startX,
+                        y: y,
+                        z: z
+                    };
+                    
+                    this.scene.add(cloud);
+                    this.clouds.push(cloud);
+                }
+                
+                // Добавляем несколько маленьких облачков для разнообразия
+                for (let i = 0; i < 6; i++) {
+                    const cloudMat = new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        emissive: 0x333333,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
                     const cloudGroup = new THREE.Group();
                     
-                    // Каждое облако состоит из нескольких частей
-                    const parts = 5 + Math.floor(Math.random() * 8);
-                    
-                    for (let j = 0; j < parts; j++) {
-                        const cloudPart = new THREE.Mesh(
-                            new THREE.SphereGeometry(0.8 + Math.random() * 0.7, 7, 5),
+                    for (let j = 0; j < 5; j++) {
+                        const part = new THREE.Mesh(
+                            new THREE.SphereGeometry(1.2 + Math.random() * 0.8, 5, 4),
                             cloudMat
                         );
-                        
-                        const angle = (j / parts) * Math.PI * 2;
-                        const radius = 1.0 + Math.random() * 1.5;
-                        
-                        cloudPart.position.set(
-                            Math.cos(angle) * radius * 0.8,
-                            Math.sin(j * 2) * 0.4 + Math.random() * 0.5,
-                            Math.sin(angle) * radius * 0.8
-                        );
-                        
-                        cloudPart.rotation.x = Math.random() * Math.PI;
-                        cloudPart.rotation.y = Math.random() * Math.PI;
-                        cloudPart.rotation.z = Math.random() * Math.PI;
-                        
-                        cloudGroup.add(cloudPart);
+                        part.position.set(j * 1.8 - 4, Math.sin(j) * 0.5, 0);
+                        cloudGroup.add(part);
                     }
                     
-                    // Размер облака
-                    const scale = 2 + Math.random() * 4;
-                    cloudGroup.scale.set(scale, scale * 0.4, scale * 0.6);
+                    cloudGroup.scale.set(1.5, 0.4, 0.8);
                     
-                    // Позиция: X от -40 до 40, Y от 8 до 25, Z от -30 до 30
-                    const startX = -40 + Math.random() * 80;
-                    const y = 10 + Math.random() * 15;
-                    const z = -25 + Math.random() * 50;
+                    const y = 24 + Math.random() * 8;
+                    const z = -20 + Math.random() * 40;
+                    const startX = -35 + Math.random() * 20;
                     
                     cloudGroup.position.set(startX, y, z);
                     
-                    // Скорость движения слева направо (все разные)
                     cloudGroup.userData = {
-                        speed: 0.01 + Math.random() * 0.03,
+                        speed: 0.015 + Math.random() * 0.025,
                         startX: startX,
                         y: y,
-                        z: z,
-                        scale: scale
+                        z: z
                     };
                     
                     this.scene.add(cloudGroup);
@@ -618,28 +638,12 @@
                     this.scene.add(baseField);
                 }
                 
-                // --- СЕТКА ---
+                // --- СЕТКА (БЕЗ ЖЕЛТЫХ ТОЧЕК) ---
                 const gridHelper = new THREE.GridHelper(this.gridSize, this.gridSize, 0x8b6e4b, 0x5a3e2b);
                 gridHelper.position.set(0, 0.01, 0);
-                gridHelper.material.opacity = 0.4;
+                gridHelper.material.opacity = 0.3;
                 gridHelper.material.transparent = true;
                 this.fieldGroup.add(gridHelper);
-                
-                // Угловые маркеры
-                const dotMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
-                const offset = this.gridSize / 2 - 0.5;
-                
-                const corners = [
-                    [-offset, -offset], [-offset, offset],
-                    [offset, -offset], [offset, offset]
-                ];
-                
-                corners.forEach(([x, z]) => {
-                    const dotGeo = new THREE.SphereGeometry(0.12, 8, 8);
-                    const dot = new THREE.Mesh(dotGeo, dotMat);
-                    dot.position.set(x, 0.02, z);
-                    this.fieldGroup.add(dot);
-                });
                 
                 this.scene.add(this.fieldGroup);
                 
@@ -722,10 +726,10 @@
                     group.add(glass);
                 }
                 
-                // ВАЖНО: точное позиционирование в центре клетки
-                // x и z - это координаты клетки от 0 до 13
-                // Переводим в координаты группы: центр группы в (6.5, 0, 6.5)
-                // Поэтому позиция дома: (x - 6.5 + 0.5, 0, z - 6.5 + 0.5)
+                // ТОЧНОЕ ПОЗИЦИОНИРОВАНИЕ В ЦЕНТРЕ КЛЕТКИ
+                // Координаты клетки: x от 0 до 13, z от 0 до 13
+                // Центр группы: (6.5, 0, 6.5)
+                // Позиция дома в группе: (x - 6.5 + 0.5, 0, z - 6.5 + 0.5)
                 const localX = x - this.centerX + 0.5;
                 const localZ = z - this.centerZ + 0.5;
                 group.position.set(localX, 0, localZ);
@@ -789,7 +793,7 @@
                     const gridPoint = localPoint.clone();
                     gridPoint.add(new THREE.Vector3(this.centerX, 0, this.centerZ));
                     
-                    // Получаем координаты клетки (от 0 до 13)
+                    // Получаем координаты клетки
                     const gridX = Math.floor(gridPoint.x);
                     const gridY = Math.floor(gridPoint.z);
                     
@@ -804,9 +808,10 @@
                     );
                     
                     // Проверяем, что точка внутри поля и достаточно близко к центру клетки
+                    // 0.6 меньше половины диагонали клетки (0.71)
                     if (gridX >= 0 && gridX < this.gridSize && 
                         gridY >= 0 && gridY < this.gridSize &&
-                        distToCenter < 0.6) { // 0.6 меньше половины диагонали клетки (0.71)
+                        distToCenter < 0.6) {
                         
                         return { x: gridX, y: gridY };
                     }
@@ -839,7 +844,7 @@
             animate() {
                 requestAnimationFrame(() => this.animate());
                 
-                // Анимация облаков - движение СЛЕВА НАПРАВО
+                // Анимация облаков - движение СЛЕВА НАПРАВО в верхней части
                 this.clouds.forEach(cloud => {
                     if (cloud.userData) {
                         // Двигаем облако вправо
@@ -848,8 +853,7 @@
                         // Если облако ушло далеко вправо, возвращаем его налево
                         if (cloud.position.x > 45) {
                             cloud.position.x = -45;
-                            // Немного меняем высоту для разнообразия
-                            cloud.position.y = 10 + Math.random() * 15;
+                            // Оставляем на той же высоте (верхняя часть)
                         }
                     }
                 });
