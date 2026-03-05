@@ -429,16 +429,16 @@
                     loader.loadAsync('textures/grass/roughness.jpg').then(tex => this.textures.grassRough = tex),
                     
                     // Кирпич
-                    loader.loadAsync('https://threejs.org/examples/textures/brick_diffuse.jpg').then(tex => this.textures.brickDiffuse = tex),
-                    loader.loadAsync('https://threejs.org/examples/textures/brick_normal.jpg').then(tex => this.textures.brickNormal = tex),
-                    loader.loadAsync('https://threejs.org/examples/textures/brick_roughness.jpg').then(tex => this.textures.brickRough = tex),
+                    loader.loadAsync('textures/brick/diffuse.jpg').then(tex => this.textures.brickDiffuse = tex),
+                    loader.loadAsync('textures/brick/normal.jpg').then(tex => this.textures.brickNormal = tex),
+                    loader.loadAsync('textures/brick/roughness.jpg').then(tex => this.textures.brickRough = tex),
                     
                     // Крыша
-                    loader.loadAsync('https://threejs.org/examples/textures/roof/roof_diff_1k.jpg').then(tex => this.textures.roofDiffuse = tex),
-                    loader.loadAsync('https://threejs.org/examples/textures/roof/roof_nor_1k.jpg').then(tex => this.textures.roofNormal = tex),
+                    loader.loadAsync('textures/roof/diffuse.jpg').then(tex => this.textures.roofDiffuse = tex),
+                    loader.loadAsync('textures/roof/normal.jpg').then(tex => this.textures.roofNormal = tex),
                     
                     // Дерево
-                    loader.loadAsync('https://threejs.org/examples/textures/terrain/terrain_wood_diff_1k.jpg').then(tex => this.textures.woodDiffuse = tex)
+                    loader.loadAsync('textures/wood/diffuse.jpg').then(tex => this.textures.woodDiffuse = tex)
                 ]).then(() => {
                     // Настройка повторения текстур
                     Object.values(this.textures).forEach(tex => {
